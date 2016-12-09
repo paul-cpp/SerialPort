@@ -6,10 +6,12 @@
 #include <Windows.h>
 #include <iostream>
 #include <string>
+#include <stdint.h>
 
 #include "SerialPortException.h"
 
 using namespace std;
+
 
 #define ERR_MESSAGE(str) cerr<<"ERROR in finction "<<__FUNCTION__<<"\t line "<<__LINE__<<"\n file \
 						 " << __FILE__ << endl << str << endl;
@@ -113,10 +115,14 @@ public:
 	SerialPort();
 	~SerialPort();
 	HANDLE getHandle() { return m_Handle; }
-	//void setHandle(HANDLE handle) { m_Handle = handle; } /**@warning FOR DEBUG ONLY!*/
+	//void setHandle(HANDLE handle) { m_Handle = handle; } /*@warning FOR DEBUG ONLY!*/
 	void resetInitParams();
 	void checkHandleValid();
 	void open(std::string portName, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode);
+	void open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode);
+	BOOL writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms);
+	BOOL sendData(UCHAR* data, UINT length);
+
 
 	bool isOpen();
 	void close();

@@ -122,9 +122,10 @@ public:
 	void open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode);
 	BOOL writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms);
 	BOOL sendData(UCHAR* data, UINT length);
+	int readData(void* data, UINT length, WORD maxWaitTime_ms);
 
 
-	bool isOpen();
+	BOOL isOpen();
 	void close();
 
 };

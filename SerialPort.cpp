@@ -16,8 +16,6 @@ void SerialPort::resetInitParams()
 	m_parity = 0;
 	m_stopBit = 0;
 	m_isOverlapped = false;
-
-
 }
 
 SerialPort::SerialPort()
@@ -40,11 +38,10 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 {
 	m_isOverlapped = asyncMode;
 	m_portName = "\\\\.\\" + portName;
-	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, NULL, NULL, OPEN_EXISTING, m_baudRate ? FILE_FLAG_OVERLAPPED : 0, 0);
+	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, NULL, NULL, OPEN_EXISTING, m_isOverlapped ? FILE_FLAG_OVERLAPPED : 0, 0);
 
 	if (m_Handle == INVALID_HANDLE_VALUE) {
 		ERR_MESSAGE("[CreateFile]");
-		cout << "file name\t" << m_portName << endl;
 		throw (Exception(GetLastError()));
 	}
 
@@ -69,17 +66,8 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 		mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	}
 
-	//timeouts
-	GetCommTimeouts(m_Handle, &mst_commTimeouts);
-	mst_commTimeouts.ReadIntervalTimeout = 0;
-	mst_commTimeouts.ReadTotalTimeoutConstant = 150;	//не используется
-	mst_commTimeouts.ReadTotalTimeoutMultiplier = 0;
-	mst_commTimeouts.WriteTotalTimeoutConstant = 0;
-	mst_commTimeouts.WriteTotalTimeoutMultiplier = 0;
+	setTimeouts(0, 0, 0, 0, 0);
 
-	SetCommTimeouts(m_Handle, &mst_commTimeouts);
-
-	//SetupComm(m_Handle, 20, 20);
 
 }
 void SerialPort::open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode)
@@ -151,34 +139,264 @@ BOOL SerialPort::sendData(UCHAR* data, UINT length)
 	return isOk;
 }
 
-int SerialPort::readData(void* data, UINT length, WORD maxWaitTime_ms)
+int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 {
-	if (!isOpen()) {
+	if (!isOpen())
+	{
 		ERR_MESSAGE("[Port is not open!]");
 		throw (Exception(GetLastError()));
 	}
 
-	PurgeComm(m_Handle, PURGE_RXCLEAR);
+	DWORD bytesRead;
+	DWORD waitResult;
 
-	BOOL readStatus = false;
-	DWORD bytesRead = 0;
-	DWORD errorFlags;
-	DWORD fb = 0;
+	//mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-	bytesRead = length;
-
-	readStatus = ReadFile(m_Handle, data, bytesRead, &fb, &mst_overlappedRead);
-	if (readStatus == true) {
-		if (WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms) == WAIT_OBJECT_0) {
+	BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
+	//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
+	if (!readResult) {
+		if (GetLastError() == ERROR_IO_PENDING)		{
+			//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
 		}
-		else {
-			cout << "--НЕ успел" << endl;
+
+		waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
+		if (waitResult == WAIT_OBJECT_0)
+		{
+			//cout << "WaitForSingleObject вернул WAIT_OBJECT_0! все ок" << endl;
+			if (GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, FALSE)){
+				//cout << "GetOverlappedResult завершена успешно" << endl;
+			}
+			else if (GetLastError() == ERROR_IO_INCOMPLETE) {
+				cout << "GetOverlappedResult: GetLastError ERROR_IO_INCOMPLETE" << endl;
+			}
+		}
+		if (waitResult == WAIT_TIMEOUT) {
+			cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
+		}
+		if (waitResult == WAIT_FAILED){
+			cout << "WaitForSingleObject - WAIT_FAILED " << endl;
+		}
+		if (waitResult == WAIT_ABANDONED){
+			cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
 		}
 	}
-	else if (GetLastError() == ERROR_IO_PENDING) {
-		cout << "превышено ожидание чтения" << endl;
+	else {
+		cout << "ReadFile вернул " << readResult << endl;
 	}
 
-	return fb;
+	return bytesRead;
+}
+
+void SerialPort::clear()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	PurgeComm(m_Handle, PURGE_RXCLEAR | PURGE_TXCLEAR);
+}
+
+void SerialPort::getTimeouts()
+{
+	GetCommTimeouts(m_Handle, &mst_commTimeouts);
+	cout << "ReadIntervalTimeout\t" << mst_commTimeouts.ReadIntervalTimeout << endl;
+	cout << "ReadTotalTimeoutConstant\t" << mst_commTimeouts.ReadTotalTimeoutConstant << endl;
+	cout << "ReadTotalTimeoutMultiplier\t" << mst_commTimeouts.ReadTotalTimeoutMultiplier << endl;
+	cout << "WriteTotalTimeoutConstant\t" << mst_commTimeouts.WriteTotalTimeoutConstant << endl;
+	cout << "WriteTotalTimeoutMultiplier\t" << mst_commTimeouts.WriteTotalTimeoutMultiplier << endl;
+}
+
+void SerialPort::setTimeouts(UINT ReadIntervalTimeout, UINT ReadTotalTimeoutConstant,
+	UINT ReadTotalTimeoutMultiplier, UINT WriteTotalTimeoutConstant,
+	UINT WriteTotalTimeoutMultiplier)
+{
+	//timeouts
+	GetCommTimeouts(m_Handle, &mst_commTimeouts);
+	mst_commTimeouts.ReadIntervalTimeout = ReadIntervalTimeout;
+	mst_commTimeouts.ReadTotalTimeoutConstant = ReadTotalTimeoutConstant;			//0 - не используется
+	mst_commTimeouts.ReadTotalTimeoutMultiplier = ReadTotalTimeoutMultiplier;
+	mst_commTimeouts.WriteTotalTimeoutConstant = WriteTotalTimeoutConstant;
+	mst_commTimeouts.WriteTotalTimeoutMultiplier = WriteTotalTimeoutMultiplier;
+
+	SetCommTimeouts(m_Handle, &mst_commTimeouts);
+}
+
+void SerialPort::transmitChar(unsigned char chr)
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!TransmitCommChar(m_Handle, chr))
+	{
+		ERR_MESSAGE("[TransmitCommChar]");
+		throw (Exception(GetLastError()));
+	}
 
 }
+void SerialPort::flushBuffers()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!FlushFileBuffers(m_Handle))
+	{
+		ERR_MESSAGE("[flush]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+void SerialPort::purge()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!PurgeComm(m_Handle, PURGE_TXCLEAR | PURGE_TXCLEAR))
+	{
+		ERR_MESSAGE("[purge]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+void SerialPort::purgeReadBuffer()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!PurgeComm(m_Handle, PURGE_RXCLEAR))
+	{
+		ERR_MESSAGE("[purgeReadBuffer]");
+		throw (Exception(GetLastError()));
+	}
+}
+void SerialPort::purgeWriteBuffer()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!PurgeComm(m_Handle, PURGE_TXCLEAR))
+	{
+		ERR_MESSAGE("[purgeReadBuffer]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+void SerialPort::terminateWrite()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!PurgeComm(m_Handle, PURGE_TXABORT))
+	{
+		ERR_MESSAGE("[terminateWrite]");
+		throw (Exception(GetLastError()));
+	}
+
+}
+
+void SerialPort::terminateRead()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!PurgeComm(m_Handle, PURGE_RXABORT))
+	{
+		ERR_MESSAGE("[terminateRead]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+DWORD SerialPort::getReadBufferSize()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+	DWORD dwErrors;
+	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
+	return mst_comStat.cbInQue;
+
+}
+
+DWORD SerialPort::getWriteBufferSize()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	DWORD dwErrors;
+	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
+	return mst_comStat.cbOutQue;
+}
+
+void SerialPort::cancelIO()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!CancelIo(m_Handle))
+	{
+		ERR_MESSAGE("[cancelIO]");
+		throw (Exception(GetLastError()));
+	}
+}
+void SerialPort::setBreak()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+
+	if (!SetCommBreak(m_Handle))
+	{
+		ERR_MESSAGE("[setBreak]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+void SerialPort::setUnbreak()
+{
+	if (!isOpen())
+	{
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
+	if (!ClearCommBreak(m_Handle))
+	{
+		ERR_MESSAGE("[setUnbreak]");
+		throw (Exception(GetLastError()));
+	}
+}
+
+
+
+

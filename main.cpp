@@ -12,7 +12,7 @@ using namespace std;
 
 #define TEST 1
 
-const short MSGLEN = 20;
+const short MSGLEN = 44;
 
 void fillSendData(unsigned char* data, int len)
 {
@@ -24,11 +24,16 @@ void fillSendData(unsigned char* data, int len)
 	unsigned short crc = Crc16(data, 18);
 	memcpy(data + 18, &crc, sizeof(crc));
 }
-
 void printArray(const unsigned char* data, int len)
 {
 	for (int i = 0; i < len; i++)
 		cout <<(int) data[i]<<" ";
+	cout << endl;
+}
+void printArrayVirtual(const unsigned char* data, int len)
+{
+	for (int i = 0; i < len; i++)
+		cout << data[i];
 	cout << endl;
 }
 
@@ -42,7 +47,6 @@ int main()
 
 	unsigned char msg[MSGLEN];
 	fillSendData(msg, MSGLEN);
-	printArray(msg, MSGLEN);
 
 	unsigned char buf[MSGLEN];
 	memset(buf, 0, MSGLEN);
@@ -50,19 +54,23 @@ int main()
 	int rn = 0;
 	try {
 		SerialPort port;
-		port.open(4, BaudRate::BaudRate_115200, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
+		port.open(10, BaudRate::BaudRate_9600, DataBits::DataBits_8, Parity::ParityNone, 
+				  StopBits::OneStopBit, TRUE);
+		port.clear();
 		while (true) {
 
-			port.sendData(msg, MSGLEN);
-			start = clock();
+			//port.sendData(msg, MSGLEN);
+			//start = clock();
 			
 			memset(buf, 0, MSGLEN);
-			int readResult = port.readData(buf, MSGLEN, 0);
+			int readResult = port.readData(buf, MSGLEN, 5000);
 
 			if (readResult > 0) {
-			cout << "time\t" <<  (((double) clock() - start) / (double)CLOCKS_PER_SEC)<< endl;
-				printArray(buf, readResult);
+				//cout << "time\t" <<  (((double) clock() - start) / (double)CLOCKS_PER_SEC)<< endl;
+				printArrayVirtual(buf, readResult);
 			}
+			else
+				cout << "readData вернул 0" << endl;
 		}
 	}
 	catch (Exception &e) {

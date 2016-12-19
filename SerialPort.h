@@ -12,9 +12,7 @@
 
 using namespace std;
 
-
-#define ERR_MESSAGE(str) cerr<<"ERROR in finction "<<__FUNCTION__<<"\t line "<<__LINE__<<"\n file \
-						 " << __FILE__ << endl << str << endl;
+#define ERR_MESSAGE(str) cerr<<str<<"\nERROR: "<<__FUNCTION__<<"  line "<<__LINE__ << endl;
 
 #define DEBUG_MESSAGE(str) cout<<"[DEBUG]:\t"<<str<<endl;
 
@@ -36,13 +34,11 @@ static enum BaudRate : DWORD
 	BaudRate_128000 = 128000,
 	BaudRate_256000 = 256000
 };
-
 static enum Direction  {
 	Input = 1,
 	Output = 2,
 	AllDirections = Input | Output
 };
-
 static enum DataBits
 {
 	DataBits_5 = 5,
@@ -50,7 +46,6 @@ static enum DataBits
 	DataBits_7 = 7,
 	DataBits_8 = 8,
 };
-
 static enum Parity
 {
 	// from WinBase.h
@@ -60,21 +55,18 @@ static enum Parity
 	ParityMark = PARITY_MARK,
 	ParitySpace = PARITY_SPACE
 };
-
 static enum StopBits
 {
 	OneStopBit = ONESTOPBIT,
 	OneAndHalfStopBits = ONE5STOPBITS,
 	TwoStopBits = TWOSTOPBITS,
 };
-
 static enum FlowControl
 {
 	NoflowControl,
 	HardwareControl,
 	SoftwareControl,
 };
-
 static enum PinoutSignal {
 	NoSignal = 0x00,							//No signal
 	TransmittedDataSignal = 0x01,				//TxD
@@ -122,11 +114,34 @@ public:
 	void open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode);
 	BOOL writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms);
 	BOOL sendData(UCHAR* data, UINT length);
-	int readData(void* data, UINT length, WORD maxWaitTime_ms);
+	int readData(unsigned char* data, UINT length, WORD maxWaitTime_ms);
 
 
+	void getTimeouts();
+	void setTimeouts(UINT ReadIntervalTimeout = 0, UINT ReadTotalTimeout = 0,
+		UINT ReadTotalTimeoutMultiplier = 0, UINT WriteTotalTimeoutConstant = 0,
+		UINT WriteTotalTimeoutMultiplier = 0);
+
+	void clear();
 	BOOL isOpen();
 	void close();
+
+
+	void transmitChar(unsigned char chr);			//только синхронно
+	void flushBuffers();
+	void purge();
+	void purgeReadBuffer();
+	void purgeWriteBuffer();
+	void terminateWrite();
+	void terminateRead();
+	void cancelIO();
+	void setBreak();
+	void setUnbreak(); //xD
+
+	DWORD getReadBufferSize();
+	DWORD getWriteBufferSize();
+
+
 
 };
 

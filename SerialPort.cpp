@@ -397,6 +397,3 @@ void SerialPort::setUnbreak()
 	}
 }
 
-
-
-

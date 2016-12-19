@@ -8,6 +8,8 @@
 #include "SerialPortException.h"
 #include "CRC.h"
 
+#include "Console.h"
+
 using namespace std;
 
 #define TEST 1
@@ -37,14 +39,13 @@ void printArrayVirtual(const unsigned char* data, int len)
 	cout << endl;
 }
 
+
 #if (TEST)
 //test
 int main()
 {
 	setlocale(LC_ALL, "rus");
-
-	clock_t start, end;
-
+	
 	unsigned char msg[MSGLEN];
 	fillSendData(msg, MSGLEN);
 
@@ -63,7 +64,7 @@ int main()
 			//start = clock();
 			
 			memset(buf, 0, MSGLEN);
-			int readResult = port.readData(buf, MSGLEN, 5000);
+			int readResult = port.readData(buf, MSGLEN, 1000);
 
 			if (readResult > 0) {
 				//cout << "time\t" <<  (((double) clock() - start) / (double)CLOCKS_PER_SEC)<< endl;

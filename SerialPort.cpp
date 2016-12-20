@@ -40,7 +40,7 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 {
 	m_isOverlapped = asyncMode;
 	m_portName = "\\\\.\\" + portName;
-	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, NULL, NULL, OPEN_EXISTING, m_baudRate ? FILE_FLAG_OVERLAPPED : 0, 0);
+	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, NULL, NULL, OPEN_EXISTING, m_isOverlapped ? FILE_FLAG_OVERLAPPED : 0, 0);
 
 	if (m_Handle == INVALID_HANDLE_VALUE) {
 		ERR_MESSAGE("[CreateFile]");
@@ -72,7 +72,7 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 	//timeouts
 	GetCommTimeouts(m_Handle, &mst_commTimeouts);
 	mst_commTimeouts.ReadIntervalTimeout = 0;
-	mst_commTimeouts.ReadTotalTimeoutConstant = 150;	//не используется
+	mst_commTimeouts.ReadTotalTimeoutConstant = 0;	//0 - не используется
 	mst_commTimeouts.ReadTotalTimeoutMultiplier = 0;
 	mst_commTimeouts.WriteTotalTimeoutConstant = 0;
 	mst_commTimeouts.WriteTotalTimeoutMultiplier = 0;
@@ -159,26 +159,24 @@ int SerialPort::readData(void* data, UINT length, WORD maxWaitTime_ms)
 	}
 
 	PurgeComm(m_Handle, PURGE_RXCLEAR);
-
-	BOOL readStatus = false;
 	DWORD bytesRead = 0;
-	DWORD errorFlags;
-	DWORD fb = 0;
-
-	bytesRead = length;
-
-	readStatus = ReadFile(m_Handle, data, bytesRead, &fb, &mst_overlappedRead);
-	if (readStatus == true) {
-		if (WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms) == WAIT_OBJECT_0) {
-		}
-		else {
-			cout << "--НЕ успел" << endl;
+	DWORD waitResult;
+	if (!ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead)) {
+		if (GetLastError() == ERROR_IO_PENDING) {
+			waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
+			if (waitResult == WAIT_OBJECT_0){
+				GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, FALSE);
+			}
+			if (waitResult == WAIT_TIMEOUT){
+				cout << "readData: WAIT_TIMEOUT error" << endl;
+			}
+			if (waitResult == WAIT_FAILED){
+				cout << "readData: WAIT_FAILED error" << endl;
+			}
 		}
 	}
-	else if (GetLastError() == ERROR_IO_PENDING) {
-		cout << "превышено ожидание чтения" << endl;
-	}
 
-	return fb;
+	return bytesRead;
+
 
 }

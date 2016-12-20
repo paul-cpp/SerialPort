@@ -12,7 +12,7 @@ using namespace std;
 
 #define TEST 1
 
-const short MSGLEN = 20;
+const short MSGLEN = 44;
 
 void fillSendData(unsigned char* data, int len)
 {
@@ -28,7 +28,7 @@ void fillSendData(unsigned char* data, int len)
 void printArray(const unsigned char* data, int len)
 {
 	for (int i = 0; i < len; i++)
-		cout <<(int) data[i]<<" ";
+		cout << data[i];
 	cout << endl;
 }
 
@@ -37,6 +37,7 @@ void printArray(const unsigned char* data, int len)
 int main()
 {
 	setlocale(LC_ALL, "rus");
+	SerialPort port;
 
 	clock_t start, end;
 
@@ -49,18 +50,15 @@ int main()
 
 	int rn = 0;
 	try {
-		SerialPort port;
-		port.open(4, BaudRate::BaudRate_115200, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
+		port.open(11, BaudRate::BaudRate_9600, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
 		while (true) {
 
-			port.sendData(msg, MSGLEN);
-			start = clock();
-			
+			//port.sendData(msg, MSGLEN);
+
 			memset(buf, 0, MSGLEN);
-			int readResult = port.readData(buf, MSGLEN, 0);
+			int readResult = port.readData(buf, MSGLEN, 1000);
 
 			if (readResult > 0) {
-			cout << "time\t" <<  (((double) clock() - start) / (double)CLOCKS_PER_SEC)<< endl;
 				printArray(buf, readResult);
 			}
 		}

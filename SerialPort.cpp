@@ -28,10 +28,9 @@ SerialPort::~SerialPort()
 
 }
 
-void SerialPort::checkHandleValid()
+BOOL SerialPort::isHandleValid()
 {
-	if (m_Handle == INVALID_HANDLE_VALUE)
-		throw (Exception(GetLastError()));
+	return m_Handle == INVALID_HANDLE_VALUE ? false : true;
 }
 
 void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode)
@@ -189,16 +188,6 @@ int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 	}
 
 }
-void SerialPort::clear()
-{
-	if (!isOpen())
-	{
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
-
-	PurgeComm(m_Handle, PURGE_RXCLEAR | PURGE_TXCLEAR);
-}
 
 void SerialPort::getTimeouts()
 {
@@ -209,6 +198,11 @@ void SerialPort::getTimeouts()
 	cout << "WriteTotalTimeoutConstant\t" << mst_commTimeouts.WriteTotalTimeoutConstant << endl;
 	cout << "WriteTotalTimeoutMultiplier\t" << mst_commTimeouts.WriteTotalTimeoutMultiplier << endl;
 }
+COMMTIMEOUTS SerialPort::getTimeoutsToStruct()
+{
+	return mst_commTimeouts;
+}
+
 
 void SerialPort::setTimeouts(UINT ReadIntervalTimeout, UINT ReadTotalTimeoutConstant,
 	UINT ReadTotalTimeoutMultiplier, UINT WriteTotalTimeoutConstant,
@@ -299,7 +293,7 @@ void SerialPort::purgeWriteBuffer()
 	}
 }
 
-void SerialPort::terminateWrite()
+void SerialPort::terminateWrite(BOOL purgeData)
 {
 	if (!isOpen())
 	{
@@ -307,26 +301,45 @@ void SerialPort::terminateWrite()
 		throw (Exception(GetLastError()));
 	}
 
-	if (!PurgeComm(m_Handle, PURGE_TXABORT))
+	if (purgeData)
 	{
-		ERR_MESSAGE("[terminateWrite]");
-		throw (Exception(GetLastError()));
+		if (!PurgeComm(m_Handle, PURGE_TXABORT | PURGE_TXCLEAR)) 	{
+			ERR_MESSAGE("[PURGE_TXABORT]");
+			throw (Exception(GetLastError()));
+		}
 	}
+	else {
+		if (!PurgeComm(m_Handle, PURGE_TXABORT)) 	{
+			ERR_MESSAGE("[PURGE_TXABORT]");
+			throw (Exception(GetLastError()));
+		}
+	}
+
 
 }
 
-void SerialPort::terminateRead()
+void SerialPort::terminateRead(BOOL purgeData)
 {
 	if (!isOpen())
 	{
 		ERR_MESSAGE("[Port is not open!]");
 		throw (Exception(GetLastError()));
 	}
-
-	if (!PurgeComm(m_Handle, PURGE_RXABORT))
+	if (purgeData)
 	{
-		ERR_MESSAGE("[terminateRead]");
-		throw (Exception(GetLastError()));
+
+		if (!PurgeComm(m_Handle, PURGE_RXABORT | PURGE_RXCLEAR))
+		{
+			ERR_MESSAGE("[PURGE_RXABORT]");
+			throw (Exception(GetLastError()));
+		}
+	}
+	else {
+		if (!PurgeComm(m_Handle, PURGE_RXABORT))
+		{
+			ERR_MESSAGE("[PURGE_RXABORT]");
+			throw (Exception(GetLastError()));
+		}
 	}
 }
 
@@ -398,4 +411,11 @@ void SerialPort::setUnbreak()
 		throw (Exception(GetLastError()));
 	}
 }
+
+void SerialPort::attach(HANDLE& otherPort)
+{
+	//TODO:: need test 
+	m_Handle = otherPort;
+}
+
 

@@ -150,44 +150,45 @@ int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 	DWORD bytesRead;
 	DWORD waitResult;
 	//mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		if (GetLastError() == ERROR_IO_PENDING) {
-	BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
-	//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
-	if (!readResult) {
-		if (GetLastError() == ERROR_IO_PENDING)		{
-			//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
-		}
-		waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
-		if (waitResult == WAIT_OBJECT_0)
-		{
-			//cout << "WaitForSingleObject вернул WAIT_OBJECT_0! все ок" << endl;
-			if (GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, FALSE)){
-				//cout << "GetOverlappedResult завершена успешно" << endl;
+	if (GetLastError() == ERROR_IO_PENDING) {
+		BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
+		//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
+		if (!readResult) {
+			if (GetLastError() == ERROR_IO_PENDING)		{
+				//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
 			}
-			else if (GetLastError() == ERROR_IO_INCOMPLETE) {
-				cout << "GetOverlappedResult: GetLastError ERROR_IO_INCOMPLETE" << endl;
+			waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
+			if (waitResult == WAIT_OBJECT_0)
+			{
+				//cout << "WaitForSingleObject вернул WAIT_OBJECT_0! все ок" << endl;
+				if (GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, FALSE)){
+					//cout << "GetOverlappedResult завершена успешно" << endl;
+				}
+				else if (GetLastError() == ERROR_IO_INCOMPLETE) {
+					cout << "GetOverlappedResult: GetLastError ERROR_IO_INCOMPLETE" << endl;
+				}
 			}
-		}
-		if (waitResult == WAIT_TIMEOUT) {
-			cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
-		}
-		if (waitResult == WAIT_FAILED){
-			cout << "WaitForSingleObject - WAIT_FAILED " << endl;
-		}
-		if (waitResult == WAIT_ABANDONED){
-			cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
-		}
-	}
-	else {
-		cout << "ReadFile вернул " << readResult << endl;
+			if (waitResult == WAIT_TIMEOUT) {
+				cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
 			}
 			if (waitResult == WAIT_FAILED){
-				cout << "readData: WAIT_FAILED error" << endl;
+				cout << "WaitForSingleObject - WAIT_FAILED " << endl;
+			}
+			if (waitResult == WAIT_ABANDONED){
+				cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
+			}
+		}
+		else {
+			cout << "ReadFile вернул " << readResult << endl;
+		}
+		if (waitResult == WAIT_FAILED){
+			cout << "readData: WAIT_FAILED error" << endl;
+		}
+
+		return bytesRead;
 	}
 
-	return bytesRead;
 }
-
 void SerialPort::clear()
 {
 	if (!isOpen())

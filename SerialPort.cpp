@@ -62,8 +62,8 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 	}
 
 	if (m_isOverlapped) {
-		mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+		mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
 	}
 
 	//таймауты не переопределяются
@@ -88,6 +88,7 @@ void SerialPort::close()
 	if (isOpen()) {
 		CloseHandle(m_Handle);
 		m_Handle = INVALID_HANDLE_VALUE;
+
 	}
 }
 
@@ -199,7 +200,7 @@ void SerialPort::setTimeouts(UINT ReadIntervalTimeout, UINT ReadTotalTimeoutCons
 	//timeouts
 	GetCommTimeouts(m_Handle, &mst_commTimeouts);
 	mst_commTimeouts.ReadIntervalTimeout = ReadIntervalTimeout;
-	mst_commTimeouts.ReadTotalTimeoutConstant = ReadTotalTimeoutConstant;			//0 - не используется
+	mst_commTimeouts.ReadTotalTimeoutConstant = ReadTotalTimeoutConstant;		//0 - не используется
 	mst_commTimeouts.ReadTotalTimeoutMultiplier = ReadTotalTimeoutMultiplier;
 	mst_commTimeouts.WriteTotalTimeoutConstant = WriteTotalTimeoutConstant;
 	mst_commTimeouts.WriteTotalTimeoutMultiplier = WriteTotalTimeoutMultiplier;

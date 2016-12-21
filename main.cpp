@@ -62,7 +62,7 @@ int main()
 			//Sleep(400);
 
 			memset(buf, 0, MSGLEN);
-			int readResult = port.readData(buf, MSGLEN, 1000);
+			int readResult = port.readData(buf, MSGLEN, 300);
 			
 			if (readResult > 0) {
 				cout << readResult << "\t";

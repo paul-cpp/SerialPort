@@ -16,6 +16,8 @@ using namespace std;
 
 #define DEBUG_MESSAGE(str) cout<<"[DEBUG]:\t"<<str<<endl;
 
+
+
 /**
  * @enum	BaudRate
  *
@@ -324,7 +326,7 @@ public:
 	 * @brief	¬осстанавливает передачу данных дл€ порта 
 	 * 			и устанавливает линию передачи в нормальное состо€ние
 	 */
-	void restoreLine(); 
+	void restoreLine();
 
 
 	///**
@@ -340,7 +342,7 @@ public:
 	// * @return	–азмер буфера записи
 	// */
 	//DWORD writeBufferSize();
-
+	
 	
 
 

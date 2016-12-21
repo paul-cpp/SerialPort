@@ -217,25 +217,22 @@ public:
 	*/
 	void open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode);
 
-	//TODO: переделать полностью!
 	/**
-	 * @fn	BOOL SerialPort::writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms);
-	 * @brief	Writes an one character.
-	 * @param	oneChar		  	The one character.
-	 * @param	maxWaitTime_ms	The maximum wait time in milliseconds.
-	 * @return	True if it succeeds, false if it fails.
+	 * @brief	Запись данных в порт
+	 * @param	data		  	данные для записи
+	 * @param	length		  	длина передаваемых данных
+	 * @param	maxWaitTIme_ms	максимальное время ожидания (в миллисекундах) для асинхронной операции
+	 * @return	Количество успешно переданных байт.
 	 */
-	BOOL writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms);
-	//TODO: переделать полностью!
 
-	BOOL sendData(UCHAR* data, UINT length);
+	int writeData(const unsigned char* data, UINT length, WORD maxWaitTIme_ms);
 
 	/**
 	 * @brief	Чтение данных из последовательного порта
 	 * @param [in,out]	data		  	выходной буфер 
 	 * @param 		  	length		  	длина буфера
 	 * @param 		  	maxWaitTime_ms	максимальное время ожидания (в миллисекундах) для асинхронной операции
-	 * @return	Количество прочитанных байт
+	 * @return	Количество успешно прочитанных байт
 	 */
 	int readData(unsigned char* data, UINT length, WORD maxWaitTime_ms);
 
@@ -247,7 +244,7 @@ public:
 	COMMTIMEOUTS getTimeoutsToStruct();
 
 	/**
-	 * @brief	Sets the timeouts.
+	 * @brief	Sets the timeouts. Значение 0 - таймаут не используется
 	 * @param	ReadIntervalTimeout		   	(Optional) The read interval timeout.
 	 * @param	ReadTotalTimeout		   	(Optional) The read total timeout.
 	 * @param	ReadTotalTimeoutMultiplier 	(Optional) The read total timeout multiplier.
@@ -321,26 +318,31 @@ public:
 	 * 			и установка линии передачи в состояние разрыва,
 	 * 			пока ClearCommBreak функция не вызывается.
 	 */
-	void setBreak();
+	void breakLine();
 
 	/**
 	 * @brief	Восстанавливает передачу данных для порта 
 	 * 			и устанавливает линию передачи в нормальное состояние
 	 */
-	void setUnbreak(); //xD
+	void restoreLine(); 
 
-	/**
-	 * @brief	Получает число символов в приемном буфере. 
-	 * 			Эти символы приняты из линии, но еще не считаны функцией ReadFile;
-	 * @return	Размер буфера чтения
-	 */
-	DWORD getReadBufferSize();
 
-	/**
-	 * @brief	Получает число символов в передающем буфере. Эти символы еще не переданы в линию
-	 * @return	Размер буфера записи
-	 */
-	DWORD getWriteBufferSize();
+	///**
+	// * @brief	Получает число символов в приемном буфере. 
+	// * 			Эти символы приняты из линии, но еще не считаны функцией ReadFile;
+	// * @return	Размер буфера чтения
+	// * @warning у меня всегда возаращает ноль 
+	// */
+	//DWORD readBufferSize();
+	//
+	///**
+	// * @brief	Получает число символов в передающем буфере. Эти символы еще не переданы в линию
+	// * @return	Размер буфера записи
+	// */
+	//DWORD writeBufferSize();
+
+	
+
 
 	//TODO: потоки **ные и работа с ними
 

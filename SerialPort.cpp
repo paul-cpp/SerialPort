@@ -7,6 +7,7 @@ void SerialPort::resetInitParams()
 	memset(&mst_commConfig, 0, sizeof(COMMCONFIG));
 	memset(&mst_dcb, 0, sizeof(DCB));
 	memset(&mst_commTimeouts, 0, sizeof(COMMTIMEOUTS));
+
 	memset(&mst_overlappedRead, 0, sizeof(OVERLAPPED));
 	memset(&mst_overlappedWrite, 0, sizeof(OVERLAPPED));
 
@@ -65,8 +66,8 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 		mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	}
 
+	//таймауты не переопределяются
 	setTimeouts(0, 0, 0, 0, 0);
-
 
 }
 void SerialPort::open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode)
@@ -90,52 +91,43 @@ void SerialPort::close()
 	}
 }
 
-BOOL SerialPort::writeOneChar(UCHAR oneChar, WORD maxWaitTime_ms)
+int SerialPort::writeData(const unsigned char* data, UINT length, WORD maxWaitTime_ms)
 {
-	if (!isOpen()) {
+	if (!isOpen())	{
 		ERR_MESSAGE("[Port is not open!]");
 		throw (Exception(GetLastError()));
 	}
 
-	BOOL writeResult = false;
-	DWORD bytesWritten = 0;
+	DWORD bytesTransfered = 0;
+	DWORD waitResult;
 
-	writeResult = WriteFile(m_Handle, &oneChar, 1, &bytesWritten, &mst_overlappedWrite);
-	if (!writeResult) {
-		if (WaitForSingleObject(mst_overlappedWrite.hEvent, maxWaitTime_ms) != WAIT_OBJECT_0) {
-			bytesWritten = 0;
-			return false;
-		}
-		else {
-			GetOverlappedResult(m_Handle, &mst_overlappedWrite, &bytesWritten, TRUE);
-			mst_overlappedWrite.Offset += bytesWritten;
-			return true;
-		}
-	}
-}
+	DWORD writeResult = WriteFile(m_Handle, data, length, &bytesTransfered, &mst_overlappedWrite);
+	if (!writeResult)
+	{
+		if (GetLastError() == ERROR_IO_PENDING)
+		{
+			//DEBUG_MESSAGE("асинхронная запись стартовала");
 
-BOOL SerialPort::sendData(UCHAR* data, UINT length)
-{
-	if (!isOpen()) {
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
-	PurgeComm(m_Handle, PURGE_TXCLEAR);
-
-	BOOL isOk = false;
-	DWORD bytesWritten = 0;
-	int i;
-	for (int i = 0; i < length; i++) {
-		if (writeOneChar(data[i], 100))
-			bytesWritten++;
-		else {
-			ERR_MESSAGE("[sendData:] не записался символ с индексом" + i);
+			waitResult = WaitForSingleObject(mst_overlappedWrite.hEvent, maxWaitTime_ms);
+			if (waitResult == WAIT_OBJECT_0) {
+				(GetOverlappedResult(m_Handle, &mst_overlappedWrite, &bytesTransfered, FALSE));
+				//DEBUG_MESSAGE("GetOverlappedResult OK");
+			}
+			else if (waitResult == WAIT_TIMEOUT){
+				cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
+				return  0;
+			}
+			else if (waitResult == WAIT_FAILED){
+				cout << "WaitForSingleObject - WAIT_FAILED " << endl;
+				return 0;
+			}
+			else if (waitResult == WAIT_ABANDONED){
+				cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
+				return 0;
+			}
 		}
 	}
-	if (bytesWritten == length)
-		isOk = true;
-
-	return isOk;
+	return bytesTransfered;
 }
 
 int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
@@ -146,16 +138,15 @@ int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 		throw (Exception(GetLastError()));
 	}
 
-	DWORD bytesRead;
+	DWORD bytesRead = 0;
 	DWORD waitResult;
-	//mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (GetLastError() == ERROR_IO_PENDING) {
-		BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
-		//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
-		if (!readResult) {
-			if (GetLastError() == ERROR_IO_PENDING)		{
-				//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
-			}
+	BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
+	//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
+	if (!readResult)
+	{
+		if (GetLastError() == ERROR_IO_PENDING)
+		{
+			//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
 			waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
 			if (waitResult == WAIT_OBJECT_0)
 			{
@@ -165,28 +156,25 @@ int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 				}
 				else if (GetLastError() == ERROR_IO_INCOMPLETE) {
 					cout << "GetOverlappedResult: GetLastError ERROR_IO_INCOMPLETE" << endl;
+					return 0;
 				}
 			}
-			if (waitResult == WAIT_TIMEOUT) {
+			else if (waitResult == WAIT_TIMEOUT) {
 				cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
+				return bytesRead;	//возвращает фактически прочитанное
 			}
-			if (waitResult == WAIT_FAILED){
+			else if (waitResult == WAIT_FAILED){
 				cout << "WaitForSingleObject - WAIT_FAILED " << endl;
+				return 0;
 			}
-			if (waitResult == WAIT_ABANDONED){
+			else if (waitResult == WAIT_ABANDONED){
 				cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
+				return 0;
 			}
 		}
-		else {
-			cout << "ReadFile вернул " << readResult << endl;
-		}
-		if (waitResult == WAIT_FAILED){
-			cout << "readData: WAIT_FAILED error" << endl;
-		}
-
-		return bytesRead;
 	}
 
+	return bytesRead;
 }
 
 void SerialPort::getTimeouts()
@@ -343,20 +331,22 @@ void SerialPort::terminateRead(BOOL purgeData)
 	}
 }
 
-DWORD SerialPort::getReadBufferSize()
+/*
+DWORD SerialPort::readBufferSize()
 {
 	if (!isOpen())
 	{
 		ERR_MESSAGE("[Port is not open!]");
 		throw (Exception(GetLastError()));
 	}
-	DWORD dwErrors;
+	DWORD dwErrors = 0;
+	//заполнение структуры COMSTAT
 	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
 	return mst_comStat.cbInQue;
 
 }
 
-DWORD SerialPort::getWriteBufferSize()
+DWORD SerialPort::writeBufferSize()
 {
 	if (!isOpen())
 	{
@@ -368,6 +358,7 @@ DWORD SerialPort::getWriteBufferSize()
 	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
 	return mst_comStat.cbOutQue;
 }
+*/
 
 void SerialPort::cancelIO()
 {
@@ -383,7 +374,7 @@ void SerialPort::cancelIO()
 		throw (Exception(GetLastError()));
 	}
 }
-void SerialPort::setBreak()
+void SerialPort::breakLine()
 {
 	if (!isOpen())
 	{
@@ -398,7 +389,7 @@ void SerialPort::setBreak()
 	}
 }
 
-void SerialPort::setUnbreak()
+void SerialPort::restoreLine()
 {
 	if (!isOpen())
 	{

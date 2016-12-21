@@ -12,7 +12,7 @@ using namespace std;
 
 #define TEST 1
 
-const short MSGLEN = 44;
+const short MSGLEN = 20;
 
 void fillSendData(unsigned char* data, int len)
 {
@@ -43,28 +43,40 @@ int main()
 
 	unsigned char msg[MSGLEN];
 	fillSendData(msg, MSGLEN);
-	printArray(msg, MSGLEN);
 
 	unsigned char buf[MSGLEN];
 	memset(buf, 0, MSGLEN);
 
 	int rn = 0;
 	try {
-		port.open(11, BaudRate::BaudRate_9600, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
+		port.open(4, BaudRate::BaudRate_115200, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
+		port.purge();
 		while (true) {
 
-			//port.sendData(msg, MSGLEN);
+			port.writeData(msg, MSGLEN,300);
+			//cout << "Отправлено:\t";
+			//for (int i = 0; i<MSGLEN; i++){
+			//	cout <<(int) msg[i] << " ";
+			//}
+			//cout << endl;
+			//Sleep(400);
 
 			memset(buf, 0, MSGLEN);
 			int readResult = port.readData(buf, MSGLEN, 1000);
-
+			
 			if (readResult > 0) {
-				printArray(buf, readResult);
+				cout << readResult << "\t";
+				for (int i = 0; i < MSGLEN; i++){
+					cout << (int)buf[i] << " ";
+				}
+				cout << endl;
 			}
+			else
+				cout << "readResult=0" << endl;
 		}
 	}
 	catch (Exception &e) {
-		e.what();
+		e.what_msgBox();
 	}
 	//sdfsd
 

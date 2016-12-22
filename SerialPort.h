@@ -14,14 +14,19 @@ using namespace std;
 
 #define ERR_MESSAGE(str) cerr<<str<<"\nERROR: "<<__FUNCTION__<<"  line "<<__LINE__ << endl;
 
-#define DEBUG_MESSAGE(str) cout<<"[DEBUG]:\t"<<str<<endl;
+#define DEBUG_MESSAGE(str) cout<<"[DEBUG]:\t"<str<<endl;
 
 
+template <typename T>
+void debug_mesage(char *message, T arg )
+{
+	cout << message << " " << arg << endl;
+}
 
 /**
  * @enum	BaudRate
  *
- * @brief	Значения скорости передачи для последовательного порта (в бодах). 
+ * @brief	Значения скорости передачи для последовательного порта (в бодах).
  */
 static enum BaudRate : DWORD
 {
@@ -227,16 +232,16 @@ public:
 	 * @return	Количество успешно переданных байт.
 	 */
 
-	int writeData(const unsigned char* data, UINT length, WORD maxWaitTIme_ms);
+	int write(const unsigned char* data, UINT length, WORD maxWaitTIme_ms);
 
 	/**
 	 * @brief	Чтение данных из последовательного порта
-	 * @param [in,out]	data		  	выходной буфер 
+	 * @param [in,out]	data		  	выходной буфер
 	 * @param 		  	length		  	длина буфера
 	 * @param 		  	maxWaitTime_ms	максимальное время ожидания (в миллисекундах) для асинхронной операции
 	 * @return	Количество успешно прочитанных байт
 	 */
-	int readData(unsigned char* data, UINT length, WORD maxWaitTime_ms);
+	int read(unsigned char* data, UINT length, WORD maxWaitTime_ms);
 
 	/**
 	 * @fn	void SerialPort::getTimeouts();
@@ -323,32 +328,32 @@ public:
 	void breakLine();
 
 	/**
-	 * @brief	Восстанавливает передачу данных для порта 
+	 * @brief	Восстанавливает передачу данных для порта
 	 * 			и устанавливает линию передачи в нормальное состояние
 	 */
 	void restoreLine();
 
 
-	///**
-	// * @brief	Получает число символов в приемном буфере. 
-	// * 			Эти символы приняты из линии, но еще не считаны функцией ReadFile;
-	// * @return	Размер буфера чтения
-	// * @warning у меня всегда возаращает ноль 
-	// */
-	//DWORD readBufferSize();
-	//
-	///**
-	// * @brief	Получает число символов в передающем буфере. Эти символы еще не переданы в линию
-	// * @return	Размер буфера записи
-	// */
-	//DWORD writeBufferSize();
-	
-	
-
-
 	//TODO: потоки **ные и работа с ними
+	typedef struct _readArgs
+	{
+		unsigned char *data;
+		UINT length;
+		WORD maxWaitTime_ms;
+	} readArgs, *pReadArgs;
 
+	typedef struct _writeArgs
+	{
+		unsigned char *data;
+		UINT length;
+		WORD maxWaitTime_ms;
+	} writeArgs, *pWriteArgs;
+
+	DWORD WINAPI readThread(LPVOID lParams);
 };
+
+
+
 
 #endif	//_SERIAL_PORT_H_
 

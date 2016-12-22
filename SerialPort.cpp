@@ -38,7 +38,7 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 {
 	m_isOverlapped = asyncMode;
 	m_portName = "\\\\.\\" + portName;
-	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, NULL, NULL, OPEN_EXISTING, m_isOverlapped ? FILE_FLAG_OVERLAPPED : 0, 0);
+	m_Handle = CreateFile(m_portName.c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING, m_isOverlapped ? FILE_FLAG_OVERLAPPED : 0, 0);
 
 	if (m_Handle == INVALID_HANDLE_VALUE) {
 		ERR_MESSAGE("[CreateFile]");
@@ -61,10 +61,6 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 		throw (Exception(GetLastError()));
 	}
 
-	if (m_isOverlapped) {
-		mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-		mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-	}
 
 	//таймауты не переопределяются
 	setTimeouts(0, 0, 0, 0, 0);
@@ -92,91 +88,84 @@ void SerialPort::close()
 	}
 }
 
-int SerialPort::writeData(const unsigned char* data, UINT length, WORD maxWaitTime_ms)
+int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_ms)
 {
-	if (!isOpen())	{
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
 
 	DWORD bytesTransfered = 0;
 	DWORD waitResult;
+	mst_overlappedWrite.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+
 
 	DWORD writeResult = WriteFile(m_Handle, data, length, &bytesTransfered, &mst_overlappedWrite);
-	if (!writeResult)
+	if (!writeResult && GetLastError() == ERROR_IO_PENDING) //если асинхронная операция стартовала
 	{
-		if (GetLastError() == ERROR_IO_PENDING)
-		{
-			//DEBUG_MESSAGE("асинхронная запись стартовала");
-
-			waitResult = WaitForSingleObject(mst_overlappedWrite.hEvent, maxWaitTime_ms);
-			if (waitResult == WAIT_OBJECT_0) {
-				(GetOverlappedResult(m_Handle, &mst_overlappedWrite, &bytesTransfered, FALSE));
-				//DEBUG_MESSAGE("GetOverlappedResult OK");
-			}
-			else if (waitResult == WAIT_TIMEOUT){
-				cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
-				return  0;
-			}
-			else if (waitResult == WAIT_FAILED){
-				cout << "WaitForSingleObject - WAIT_FAILED " << endl;
-				return 0;
-			}
-			else if (waitResult == WAIT_ABANDONED){
-				cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
-				return 0;
-			}
+		waitResult = WaitForSingleObject(mst_overlappedWrite.hEvent, maxWaitTime_ms);
+		if (waitResult == WAIT_OBJECT_0) {
+			(GetOverlappedResult(m_Handle, &mst_overlappedWrite, &bytesTransfered, TRUE));
 		}
+		else if (waitResult == WAIT_TIMEOUT) { ERR_MESSAGE("waitResult == WAIT_TIMEOUT"); }
+		else if (waitResult == WAIT_FAILED) {}
+		else if (waitResult == WAIT_ABANDONED) {}
 	}
 	return bytesTransfered;
 }
 
-int SerialPort::readData(unsigned char* data, UINT length, WORD maxWaitTime_ms)
+
+int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 {
-	if (!isOpen())
-	{
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
+
+	BOOL terminateReadThread = false;
 
 	DWORD bytesRead = 0;
-	DWORD waitResult;
-	BOOL readResult = ReadFile(m_Handle, data, length, &bytesRead, &mst_overlappedRead);
-	//при успешном старте overlapped операций readfile GetLastError() будет равен ERROR_IO_PENDING
-	if (!readResult)
-	{
-		if (GetLastError() == ERROR_IO_PENDING)
-		{
-			//cout << "ReadFile вернул ERROR_IO_PENDING, асинхронная операция стартовала" << endl;
-			waitResult = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
-			if (waitResult == WAIT_OBJECT_0)
-			{
-				//cout << "WaitForSingleObject вернул WAIT_OBJECT_0! все ок" << endl;
-				if (GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, FALSE)){
-					//cout << "GetOverlappedResult завершена успешно" << endl;
+	DWORD bytesQue = 0;
+	DWORD mask, signal, errors;
+
+	//создаем сигнальный объект-собыьтие
+	mst_overlappedRead.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+
+	SetCommMask(m_Handle, EV_RXCHAR);
+	//ожидать события прихода байта 
+	WaitCommEvent(m_Handle, &mask, &mst_overlappedRead);
+	signal = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
+
+	//если успешно пришел байт
+	if (signal == WAIT_OBJECT_0) {
+		if (GetOverlappedResult(m_Handle, &mst_overlappedRead, &bytesRead, TRUE)){
+			//debug_mesage("GetOverlappedResult=", bytesRead);
+			if ((mask & EV_RXCHAR) != 0) { //если именно приход байта
+
+				//заполняем структуру COMSTAT
+				memset(&mst_comStat, 0, sizeof(COMSTAT));
+				ClearCommError(m_Handle, &errors, &mst_comStat);
+				bytesQue = mst_comStat.cbInQue;
+				//debug_mesage("bytesQue", bytesQue);
+
+				if (bytesQue > 0) {
+					ReadFile(m_Handle, data, bytesQue, &bytesRead, &mst_overlappedRead);
+					//ReadFile В данном случае нам не вернет корректное значение bytesRead
+
 				}
-				else if (GetLastError() == ERROR_IO_INCOMPLETE) {
-					cout << "GetOverlappedResult: GetLastError ERROR_IO_INCOMPLETE" << endl;
+				else
 					return 0;
-				}
 			}
-			else if (waitResult == WAIT_TIMEOUT) {
-				cout << "WaitForSingleObject - WAIT_TIMEOUT " << endl;
-				return bytesRead;	//возвращает фактически прочитанное
-			}
-			else if (waitResult == WAIT_FAILED){
-				cout << "WaitForSingleObject - WAIT_FAILED " << endl;
-				return 0;
-			}
-			else if (waitResult == WAIT_ABANDONED){
-				cout << "WaitForSingleObject - WAIT_ABANDONED " << endl;
-				return 0;
+
+		}
+		else {
+			if (GetLastError() == ERROR_IO_PENDING){
+				//debug_mesage("GetLastError() == ERROR_IO_PENDING", 0);
 			}
 		}
-	}
 
-	return bytesRead;
+	}
+	//не пришел за maxWaitTime_ms время
+	else if (signal == WAIT_TIMEOUT) { debug_mesage("signal == WAIT_TIMEOUT", 0); }
+	//или случилась какая-то херня
+	else if (signal == WAIT_FAILED){ debug_mesage("signal == WAIT_FAILED", 0); }
+
+	return bytesQue;
 }
+
+
 
 void SerialPort::getTimeouts()
 {
@@ -335,29 +324,29 @@ void SerialPort::terminateRead(BOOL purgeData)
 /*
 DWORD SerialPort::readBufferSize()
 {
-	if (!isOpen())
-	{
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
-	DWORD dwErrors = 0;
-	//заполнение структуры COMSTAT
-	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
-	return mst_comStat.cbInQue;
+if (!isOpen())
+{
+ERR_MESSAGE("[Port is not open!]");
+throw (Exception(GetLastError()));
+}
+DWORD dwErrors = 0;
+//заполнение структуры COMSTAT
+ClearCommError(m_Handle, &dwErrors, &mst_comStat);
+return mst_comStat.cbInQue;
 
 }
 
 DWORD SerialPort::writeBufferSize()
 {
-	if (!isOpen())
-	{
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
+if (!isOpen())
+{
+ERR_MESSAGE("[Port is not open!]");
+throw (Exception(GetLastError()));
+}
 
-	DWORD dwErrors;
-	ClearCommError(m_Handle, &dwErrors, &mst_comStat);
-	return mst_comStat.cbOutQue;
+DWORD dwErrors;
+ClearCommError(m_Handle, &dwErrors, &mst_comStat);
+return mst_comStat.cbOutQue;
 }
 */
 
@@ -408,6 +397,13 @@ void SerialPort::attach(HANDLE& otherPort)
 {
 	//TODO:: need test 
 	m_Handle = otherPort;
+}
+
+DWORD WINAPI SerialPort::readThread(LPVOID lParams)
+{
+	
+
+	return 0;
 }
 
 

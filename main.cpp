@@ -12,7 +12,7 @@ using namespace std;
 
 #define TEST 1
 
-const short MSGLEN = 20;
+const short MSGLEN = 44;
 
 void fillSendData(unsigned char* data, int len)
 {
@@ -25,16 +25,10 @@ void fillSendData(unsigned char* data, int len)
 	memcpy(data + 18, &crc, sizeof(crc));
 }
 
-void printArray(const unsigned char* data, int len)
-{
-	for (int i = 0; i < len; i++)
-		cout << data[i];
-	cout << endl;
-}
 
-#if (TEST)
-//test
-int main()
+#if (TEST==1)
+#define main_virtual() main()
+int main_virtual()
 {
 	setlocale(LC_ALL, "rus");
 	SerialPort port;
@@ -49,11 +43,11 @@ int main()
 
 	int rn = 0;
 	try {
-		port.open(4, BaudRate::BaudRate_115200, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
+		port.open(10, BaudRate::BaudRate_9600, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
 		port.purge();
 		while (true) {
 
-			port.writeData(msg, MSGLEN,300);
+			//port.writeData(msg, MSGLEN,300);
 			//cout << "Отправлено:\t";
 			//for (int i = 0; i<MSGLEN; i++){
 			//	cout <<(int) msg[i] << " ";
@@ -62,17 +56,13 @@ int main()
 			//Sleep(400);
 
 			memset(buf, 0, MSGLEN);
-			int readResult = port.readData(buf, MSGLEN, 300);
-			
-			if (readResult > 0) {
-				cout << readResult << "\t";
-				for (int i = 0; i < MSGLEN; i++){
-					cout << (int)buf[i] << " ";
-				}
-				cout << endl;
-			}
-			else
-				cout << "readResult=0" << endl;
+			int readResult = port.read(buf, MSGLEN, 300);
+
+			cout << readResult << "\t";
+			for (int i = 0; i < MSGLEN; i++)
+				cout << buf[i];
+			cout << endl;
+			cout << "-----------------------------" << endl << endl;
 		}
 	}
 	catch (Exception &e) {

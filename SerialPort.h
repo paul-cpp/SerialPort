@@ -145,6 +145,27 @@ static enum PinoutSignal {
  * @date	12/21/2016
  */
 
+
+
+typedef struct _readArgs
+{
+	unsigned char *data;
+	UINT length;
+	WORD maxWaitTime_ms;
+	DWORD readresult;
+
+} readArgs, *pReadArgs;
+
+typedef struct _writeArgs
+{
+	unsigned char *data;
+	UINT length;
+	WORD maxWaitTime_ms;
+	DWORD readresult;
+} writeArgs, *pWriteArgs;
+
+
+
 class SerialPort
 {
 protected:
@@ -183,6 +204,8 @@ public:
 	SerialPort();	//конструктор по-умолчанию
 	~SerialPort();	//деструктор по-умолчанию
 
+
+
 	/**
 	 * @brief	Получение текущего handle
 	 * @return	The handle.
@@ -201,7 +224,6 @@ public:
 	 */
 	BOOL isHandleValid();
 
-	//TODO: сделать bool
 	/**
 	 * @brief	Открытие порта и установка параметров
 	 * @param	portName 	Имя порта строкой (без \\\\.\\)
@@ -241,8 +263,9 @@ public:
 	 * @param 		  	maxWaitTime_ms	максимальное время ожидания (в миллисекундах) для асинхронной операции
 	 * @return	Количество успешно прочитанных байт
 	 */
-	int read(unsigned char* data, UINT length, WORD maxWaitTime_ms);
 
+	int read(unsigned char* data, UINT length, WORD maxWaitTIme_ms);
+	
 	/**
 	 * @fn	void SerialPort::getTimeouts();
 	 * @brief	Gets the timeouts.
@@ -335,21 +358,10 @@ public:
 
 
 	//TODO: потоки **ные и работа с ними
-	typedef struct _readArgs
-	{
-		unsigned char *data;
-		UINT length;
-		WORD maxWaitTime_ms;
-	} readArgs, *pReadArgs;
+	
 
-	typedef struct _writeArgs
-	{
-		unsigned char *data;
-		UINT length;
-		WORD maxWaitTime_ms;
-	} writeArgs, *pWriteArgs;
+	 DWORD WINAPI readThreadFunc(LPVOID lParams);
 
-	DWORD WINAPI readThread(LPVOID lParams);
 };
 
 

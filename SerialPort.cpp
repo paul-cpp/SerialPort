@@ -66,6 +66,7 @@ void SerialPort::open(std::string portName, DWORD baudrate, WORD dataBits, WORD 
 	setTimeouts(0, 0, 0, 0, 0);
 
 }
+
 void SerialPort::open(WORD portNumber, DWORD baudrate, WORD dataBits, WORD parity, WORD stopBit, bool asyncMode)
 {
 	std::string buf = "COM" + std::to_string(portNumber);
@@ -109,10 +110,10 @@ int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_m
 	}
 	return bytesTransfered;
 }
-
-
-int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
+ 
+ DWORD WINAPI SerialPort::readThreadFunc(LPVOID lParam)
 {
+	readArgs* ra = (readArgs*)lParam;
 
 	BOOL terminateReadThread = false;
 
@@ -126,7 +127,7 @@ int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 	SetCommMask(m_Handle, EV_RXCHAR);
 	//ожидать события прихода байта 
 	WaitCommEvent(m_Handle, &mask, &mst_overlappedRead);
-	signal = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
+	signal = WaitForSingleObject(mst_overlappedRead.hEvent, ra->maxWaitTime_ms);
 
 	//если успешно пришел байт
 	if (signal == WAIT_OBJECT_0) {
@@ -141,17 +142,22 @@ int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 				//debug_mesage("bytesQue", bytesQue);
 
 				if (bytesQue > 0) {
-					ReadFile(m_Handle, data, bytesQue, &bytesRead, &mst_overlappedRead);
+					ReadFile(m_Handle, ra->data, bytesQue, &bytesRead, &mst_overlappedRead);
 					//ReadFile В данном случае нам не вернет корректное значение bytesRead
-
+					if (bytesQue == ra->length) {
+						ra->readresult = bytesQue;
+						return bytesQue;
+					}
 				}
 				else
+				{
+					ra->readresult = 0;
 					return 0;
+				}
 			}
-
 		}
 		else {
-			if (GetLastError() == ERROR_IO_PENDING){
+			if (GetLastError() == ERROR_IO_PENDING) {
 				//debug_mesage("GetLastError() == ERROR_IO_PENDING", 0);
 			}
 		}
@@ -165,7 +171,26 @@ int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 	return bytesQue;
 }
 
+int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTIme_ms)
+{
+	if (!isOpen()) {
+		ERR_MESSAGE("[Port is not open!]");
+		throw (Exception(GetLastError()));
+	}
 
+	readArgs rar;
+	rar.data = data;
+	rar.length = length;
+	rar.maxWaitTime_ms = maxWaitTIme_ms;
+	rar.readresult = 0;
+
+	HANDLE hThread = CreateThread(NULL, 0,  readThreadFunc, &rar, 0, NULL);
+
+
+
+
+	return 0;
+}
 
 void SerialPort::getTimeouts()
 {
@@ -176,11 +201,11 @@ void SerialPort::getTimeouts()
 	cout << "WriteTotalTimeoutConstant\t" << mst_commTimeouts.WriteTotalTimeoutConstant << endl;
 	cout << "WriteTotalTimeoutMultiplier\t" << mst_commTimeouts.WriteTotalTimeoutMultiplier << endl;
 }
+
 COMMTIMEOUTS SerialPort::getTimeoutsToStruct()
 {
 	return mst_commTimeouts;
 }
-
 
 void SerialPort::setTimeouts(UINT ReadIntervalTimeout, UINT ReadTotalTimeoutConstant,
 	UINT ReadTotalTimeoutMultiplier, UINT WriteTotalTimeoutConstant,
@@ -212,6 +237,7 @@ void SerialPort::transmitChar(unsigned char chr)
 	}
 
 }
+
 void SerialPort::flushBuffers()
 {
 	if (!isOpen())
@@ -256,6 +282,7 @@ void SerialPort::purgeReadBuffer()
 		throw (Exception(GetLastError()));
 	}
 }
+
 void SerialPort::purgeWriteBuffer()
 {
 	if (!isOpen())
@@ -321,35 +348,6 @@ void SerialPort::terminateRead(BOOL purgeData)
 	}
 }
 
-/*
-DWORD SerialPort::readBufferSize()
-{
-if (!isOpen())
-{
-ERR_MESSAGE("[Port is not open!]");
-throw (Exception(GetLastError()));
-}
-DWORD dwErrors = 0;
-//заполнение структуры COMSTAT
-ClearCommError(m_Handle, &dwErrors, &mst_comStat);
-return mst_comStat.cbInQue;
-
-}
-
-DWORD SerialPort::writeBufferSize()
-{
-if (!isOpen())
-{
-ERR_MESSAGE("[Port is not open!]");
-throw (Exception(GetLastError()));
-}
-
-DWORD dwErrors;
-ClearCommError(m_Handle, &dwErrors, &mst_comStat);
-return mst_comStat.cbOutQue;
-}
-*/
-
 void SerialPort::cancelIO()
 {
 	if (!isOpen())
@@ -364,6 +362,7 @@ void SerialPort::cancelIO()
 		throw (Exception(GetLastError()));
 	}
 }
+
 void SerialPort::breakLine()
 {
 	if (!isOpen())
@@ -399,11 +398,5 @@ void SerialPort::attach(HANDLE& otherPort)
 	m_Handle = otherPort;
 }
 
-DWORD WINAPI SerialPort::readThread(LPVOID lParams)
-{
-	
-
-	return 0;
-}
 
 

@@ -8,6 +8,7 @@
 #include <string>
 #include <stdint.h>
 
+
 #include "SerialPortException.h"
 
 using namespace std;
@@ -136,14 +137,6 @@ static enum PinoutSignal {
 	SecondaryReceivedDataSignal = 0x200			//Secondary RxD
 };
 
-/**
- * @class	SerialPort
- *
- * @brief	A serial port.
- *
- * @author	Paul
- * @date	12/21/2016
- */
 
 
 
@@ -164,7 +157,10 @@ typedef struct _writeArgs
 	DWORD readresult;
 } writeArgs, *pWriteArgs;
 
-
+//void SomeLibraryFunc(void(*fn)(int, void*), void* userData)
+//{
+//	fn(10, userData);
+//}
 
 class SerialPort
 {
@@ -203,8 +199,6 @@ private:
 public:
 	SerialPort();	//конструктор по-умолчанию
 	~SerialPort();	//деструктор по-умолчанию
-
-
 
 	/**
 	 * @brief	Получение текущего handle
@@ -357,12 +351,9 @@ public:
 	void restoreLine();
 
 
-	//TODO: потоки **ные и работа с ними
-	
-
-	 DWORD WINAPI readThreadFunc(LPVOID lParams);
 
 };
+
 
 
 

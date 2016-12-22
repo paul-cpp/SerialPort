@@ -111,9 +111,8 @@ int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_m
 	return bytesTransfered;
 }
  
- DWORD WINAPI SerialPort::readThreadFunc(LPVOID lParam)
+int  SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTime_ms)
 {
-	readArgs* ra = (readArgs*)lParam;
 
 	BOOL terminateReadThread = false;
 
@@ -127,7 +126,7 @@ int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_m
 	SetCommMask(m_Handle, EV_RXCHAR);
 	//ожидать события прихода байта 
 	WaitCommEvent(m_Handle, &mask, &mst_overlappedRead);
-	signal = WaitForSingleObject(mst_overlappedRead.hEvent, ra->maxWaitTime_ms);
+	signal = WaitForSingleObject(mst_overlappedRead.hEvent, maxWaitTime_ms);
 
 	//если успешно пришел байт
 	if (signal == WAIT_OBJECT_0) {
@@ -142,16 +141,16 @@ int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_m
 				//debug_mesage("bytesQue", bytesQue);
 
 				if (bytesQue > 0) {
-					ReadFile(m_Handle, ra->data, bytesQue, &bytesRead, &mst_overlappedRead);
+					ReadFile(m_Handle,data, bytesQue, &bytesRead, &mst_overlappedRead);
 					//ReadFile В данном случае нам не вернет корректное значение bytesRead
-					if (bytesQue == ra->length) {
-						ra->readresult = bytesQue;
+					if (bytesQue == length) {
+						//ra->readresult = bytesQue;
 						return bytesQue;
 					}
 				}
 				else
 				{
-					ra->readresult = 0;
+					//ra->readresult = 0;
 					return 0;
 				}
 			}
@@ -169,27 +168,6 @@ int SerialPort::write(const unsigned char* data, UINT length, WORD maxWaitTime_m
 	else if (signal == WAIT_FAILED){ debug_mesage("signal == WAIT_FAILED", 0); }
 
 	return bytesQue;
-}
-
-int SerialPort::read(unsigned char* data, UINT length, WORD maxWaitTIme_ms)
-{
-	if (!isOpen()) {
-		ERR_MESSAGE("[Port is not open!]");
-		throw (Exception(GetLastError()));
-	}
-
-	readArgs rar;
-	rar.data = data;
-	rar.length = length;
-	rar.maxWaitTime_ms = maxWaitTIme_ms;
-	rar.readresult = 0;
-
-	HANDLE hThread = CreateThread(NULL, 0,  readThreadFunc, &rar, 0, NULL);
-
-
-
-
-	return 0;
 }
 
 void SerialPort::getTimeouts()

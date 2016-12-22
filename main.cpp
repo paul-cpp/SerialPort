@@ -13,6 +13,8 @@ using namespace std;
 #define TEST 1
 
 const short MSGLEN = 44;
+unsigned char msg[MSGLEN];
+unsigned char buf[MSGLEN];
 
 void fillSendData(unsigned char* data, int len)
 {
@@ -25,7 +27,6 @@ void fillSendData(unsigned char* data, int len)
 	memcpy(data + 18, &crc, sizeof(crc));
 }
 
-
 #if (TEST==1)
 #define main_virtual() main()
 int main_virtual()
@@ -35,12 +36,10 @@ int main_virtual()
 
 	clock_t start, end;
 
-	unsigned char msg[MSGLEN];
 	fillSendData(msg, MSGLEN);
 
-	unsigned char buf[MSGLEN];
 	memset(buf, 0, MSGLEN);
-
+	
 	int rn = 0;
 	try {
 		port.open(10, BaudRate::BaudRate_9600, DataBits::DataBits_8, Parity::ParityNone, StopBits::OneStopBit, true);
@@ -56,7 +55,7 @@ int main_virtual()
 			//Sleep(400);
 
 			memset(buf, 0, MSGLEN);
-			int readResult = port.read(buf, MSGLEN, 300);
+			int readResult = port.read(buf, MSGLEN, 1000);
 
 			cout << readResult << "\t";
 			for (int i = 0; i < MSGLEN; i++)
